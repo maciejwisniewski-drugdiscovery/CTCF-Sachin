@@ -325,7 +325,7 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
     temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_fasta_protein_sequences.aln')
     similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','fasta_protein_sequence_clustalo_similairty_matrix.npy')
     similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','fasta_protein_sequence_clustalo_similairty_heatmap.png')
-
+    temp_df_filepath = os.path.join(WORKDIR,'temp','fasta_protein_sequence_similarity_dataframe.pkl')
     # CREATE SIMILARITY MATRIX FOR ALL CHAINS !
     if not os.path.exists(similarity_matrix_filepath):
         # List for all protein chain structures
@@ -364,10 +364,11 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
                 similarity_matrix[i, j] = matches / len(alignment[0])
 
         np.save(similarity_matrix_filepath, similarity_matrix)
+        new_df = pd.DataFrame(all_chains_sequences)
+        new_df.to_pickle(temp_df_filepath)
     else:
         similarity_matrix = np.load(similarity_matrix_filepath)
-
-    new_df = pd.DataFrame(all_chains_sequences)
+        new_df = pd.read_pickle(temp_df_filepath)
 
     # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry' i 'Assembly'
     unique_entries = new_df['entry'].unique()
@@ -418,6 +419,7 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
     temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_pdb_protein_sequences.aln')
     similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','pdb_protein_sequence_clustalo_similairty_matrix.npy')
     similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','pdb_protein_sequence_clustalo_similairty_heatmap.png')
+    temp_df_filepath = os.path.join(WORKDIR,'temp','pdb_protein_sequence_similarity_dataframe.pkl')
 
     # CREATE SIMILARITY MATRIX FOR ALL CHAINS !
     if not os.path.exists(similarity_matrix_filepath):
@@ -451,10 +453,11 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
                 similarity_matrix[i, j] = matches / len(alignment[0])
 
         np.save(similarity_matrix_filepath, similarity_matrix)
+        new_df = pd.DataFrame(all_chains_sequences)
+        new_df.to_pickle(temp_df_filepath)
     else:
         similarity_matrix = np.load(similarity_matrix_filepath)
-
-    new_df = pd.DataFrame(all_chains_sequences)
+        new_df = pd.read_pickle(temp_df_filepath)
 
     # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry' i 'Assembly'
     unique_entries = new_df['entry'].unique()
