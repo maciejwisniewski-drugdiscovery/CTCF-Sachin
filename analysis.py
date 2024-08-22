@@ -102,7 +102,7 @@ class Assembly:
                                 print(residue)
                                 print(residue.resname)
                                 if residue.resname.strip() in list(PDB_NUCLEOTIDES_DICT.keys()):
-                                    seq += PDB_NUCLEOTIDES_DICT[residue.resname]
+                                    seq += PDB_NUCLEOTIDES_DICT[residue.resname.strip()]
                                 else:
                                     print(PDB_NUCLEOTIDES_DICT[residue.resname])
                                 print(seq)
