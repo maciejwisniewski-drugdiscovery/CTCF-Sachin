@@ -174,6 +174,8 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
             matches = sum(res1 == res2 for res1, res2 in zip(alignment[i], alignment[j]))
             similarity_matrix[i, j] = matches / len(alignment[0])
 
+    np.save(similarity_matrix_filepath, similarity_matrix)
+
     distance_matrix = 1 - similarity_matrix  # Odległość (1 - podobieństwo)
     linkage_matrix = linkage(pdist(distance_matrix), method='average')
 
