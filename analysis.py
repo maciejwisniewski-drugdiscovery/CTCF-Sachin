@@ -1,5 +1,6 @@
 import os
 import argparse
+import tempfile
 
 import pandas as pd
 import numpy as np
@@ -127,11 +128,8 @@ class Assembly:
                         if chain.id == chain_id:
                             ppb = PDB.PPBuilder()
                             peptides = ppb.build_peptides(chain)
-                            print(chain)
                             for peptide in peptides:
-                                print(peptide)
                                 seq_records.append(peptide.get_sequence())
-                                print(seq_records)
                             seq_dict[chain_id] = str(seq_records[0])
         return seq_dict
     def get_assembly_dict(self):
@@ -321,25 +319,27 @@ def pdb_dna_sequence_similarity_analysis(df,WORKDIR):
 
     plt.savefig(similarity_heatmap_filepath)
 def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
-
+    # INPUT, TEMP, OUTPUT FILES
     temp_fasta_file_input = os.path.join(WORKDIR,'temp','temp_fasta_protein_sequences.fasta')
     temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_fasta_protein_sequences.aln')
     similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','fasta_protein_sequence_clustalo_similairty_matrix.npy')
     similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','fasta_protein_sequence_clustalo_similairty_heatmap.png')
 
-
+    # CREATE SIMILARITY MATRIX FOR ALL CHAINS !
     if not os.path.exists(similarity_matrix_filepath):
-        # Get all Strand One Sequences
-        seqs = {}
-
+        all_chains_sequences = []
         for _, row in df.iterrows():
-            chain = next(iter(row['PROTEIN_PDB_sequence']))
-            seq = row['PROTEIN_FASTA_sequence'][chain]
-            seqs[row['assembly']+'_'+chain] = seq
+            for chain_id, chain_sequence in row['PROTEIN_FASTA_sequence'].items():
+                seqdict = {}
+                seqdict['structure_id'] = row['assembly']+'_'+chain_id
+                seqdict['assembly'] = row['assembly']
+                seqdict['entry'] = row['entry']
+                seqdict['protein_sequence'] = chain_sequence
+                all_chains_sequences.append(seqdict)
 
         with open(temp_fasta_file_input,'w') as f:
-            for key, seq in seqs.items():
-                f.write(f'>{key}\n{seq}\n')
+            for sequence in all_chains_sequences:
+                f.write(f'>{sequence["structure_id"]}\n{sequence["protein_sequence"]}\n')
 
         clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
                                                      outfile=temp_fasta_file_output,
@@ -360,22 +360,28 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
     else:
         similarity_matrix = np.load(similarity_matrix_filepath)
 
-    import matplotlib.pyplot as plt
+    new_df = pd.DataFrame(all_chains_sequences)
 
-    # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry'
-    unique_entries = df['entry'].unique()
-    colors = sns.color_palette("dark", len(unique_entries))
-    entry_color_map = dict(zip(unique_entries, colors))
+    # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry' i 'Assembly'
+    unique_entries = new_df['entry'].unique()
+    unique_assemblies = new_df['assembly'].unique()
 
-    # Stwórz listę kolorów odpowiadających każdemu assembly
-    assembly_colors = df['entry'].map(entry_color_map)
+    entries_colors = sns.color_palette("dark", len(unique_entries))
+    assemblies_colors = sns.color_palette("dark", len(unique_entries))
+
+    entry_color_map = dict(zip(unique_entries, entries_colors))
+    assembly_color_map = dict(zip(unique_assemblies, assemblies_colors))
+
+    # Stwórz listę kolorów odpowiadających każdemu assembly i entry
+    entry_colors = new_df['entry'].map(entry_color_map)
+    assembly_colors = new_df['assembly'].map(assembly_color_map)
 
     # Stwórz heatmapę z dodaniem kolorowych pasków (color bars)
     plt.figure(figsize=(12, 10))
 
     # Dodaj heatmapę
     sns.heatmap(similarity_matrix, annot=False, cmap="flare",
-                xticklabels=df['assembly'], yticklabels=df['assembly'],
+                xticklabels=new_df['structure_id'], yticklabels=new_df['structure_id'],
                 cbar_kws={'label': 'Similarity'}, linewidths=.5, linecolor='lightgrey')
 
     # Odległość etykiet od heatmapy
@@ -387,13 +393,17 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
         # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
         plt.gca().add_patch(
             plt.Rectangle((-1, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
-
+    for (i, color) in enumerate(entry_colors):
+        # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+        plt.gca().add_patch(
+            plt.Rectangle((-1.5, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
     # Dodaj tytuł
-    plt.text(x=-0.75, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=-0.75, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=-1.25, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+
     plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
     plt.title(label="Similarity HeatMap of Fasta Protein Sequences with Colored Labels for each Entry", fontsize=12, loc='center', x=0.5, y=1.05)
-    plt.ylabel('Assembly')
-
+    plt.ylabel('Structures [Entry_Assembly_Chain]')
     plt.savefig(similarity_heatmap_filepath)
 def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
 
@@ -402,18 +412,21 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
     similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','pdb_protein_sequence_clustalo_similairty_matrix.npy')
     similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','pdb_protein_sequence_clustalo_similairty_heatmap.png')
 
+    # CREATE SIMILARITY MATRIX FOR ALL CHAINS !
     if not os.path.exists(similarity_matrix_filepath):
-        # Get all Strand One Sequences
-        seqs = {}
-
+        all_chains_sequences = []
         for _, row in df.iterrows():
-            chain = next(iter(row['PROTEIN_PDB_sequence']))
-            seq = row['PROTEIN_PDB_sequence'][chain]
-            seqs[row['assembly']+'_'+chain] = seq
+            for chain_id, chain_sequence in row['PROTEIN_PDB_sequence'].items():
+                seqdict = {}
+                seqdict['structure_id'] = row['assembly']+'_'+chain_id
+                seqdict['assembly'] = row['assembly']
+                seqdict['entry'] = row['entry']
+                seqdict['protein_sequence'] = chain_sequence
+                all_chains_sequences.append(seqdict)
 
         with open(temp_fasta_file_input,'w') as f:
-            for key, seq in seqs.items():
-                f.write(f'>{key}\n{seq}\n')
+            for sequence in all_chains_sequences:
+                f.write(f'>{sequence["structure_id"]}\n{sequence["protein_sequence"]}\n')
 
         clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
                                                      outfile=temp_fasta_file_output,
@@ -434,22 +447,28 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
     else:
         similarity_matrix = np.load(similarity_matrix_filepath)
 
-    import matplotlib.pyplot as plt
+    new_df = pd.DataFrame(all_chains_sequences)
 
-    # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry'
-    unique_entries = df['entry'].unique()
-    colors = sns.color_palette("dark", len(unique_entries))
-    entry_color_map = dict(zip(unique_entries, colors))
+    # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry' i 'Assembly'
+    unique_entries = new_df['entry'].unique()
+    unique_assemblies = new_df['assembly'].unique()
 
-    # Stwórz listę kolorów odpowiadających każdemu assembly
-    assembly_colors = df['entry'].map(entry_color_map)
+    entries_colors = sns.color_palette("dark", len(unique_entries))
+    assemblies_colors = sns.color_palette("dark", len(unique_entries))
+
+    entry_color_map = dict(zip(unique_entries, entries_colors))
+    assembly_color_map = dict(zip(unique_assemblies, assemblies_colors))
+
+    # Stwórz listę kolorów odpowiadających każdemu assembly i entry
+    entry_colors = new_df['entry'].map(entry_color_map)
+    assembly_colors = new_df['assembly'].map(assembly_color_map)
 
     # Stwórz heatmapę z dodaniem kolorowych pasków (color bars)
     plt.figure(figsize=(12, 10))
 
     # Dodaj heatmapę
     sns.heatmap(similarity_matrix, annot=False, cmap="flare",
-                xticklabels=df['assembly'], yticklabels=df['assembly'],
+                xticklabels=new_df['structure_id'], yticklabels=new_df['structure_id'],
                 cbar_kws={'label': 'Similarity'}, linewidths=.5, linecolor='lightgrey')
 
     # Odległość etykiet od heatmapy
@@ -461,16 +480,61 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
         # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
         plt.gca().add_patch(
             plt.Rectangle((-1, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
-
+    for (i, color) in enumerate(entry_colors):
+        # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+        plt.gca().add_patch(
+            plt.Rectangle((-1.5, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
     # Dodaj tytuł
-    plt.text(x=-0.75, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
-    plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
-    plt.title(label="Similarity HeatMap of PDB Crystal Protein Sequences with Colored Labels for each Entry", fontsize=12, loc='center', x=0.5, y=1.05)
-    plt.ylabel('Assembly')
+    plt.text(x=-0.75, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=-1.25, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
 
+    plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
+    plt.title(label="Similarity HeatMap of PDB Protein Sequences with Colored Labels for each Entry", fontsize=12,
+              loc='center', x=0.5, y=1.05)
+    plt.ylabel('Structures [Entry_Assembly_Chain]')
     plt.savefig(similarity_heatmap_filepath)
 def pdb_protein_tmscore_analysis(df,WORKDIR):
-    return None
+    tmscore_matrix_filepath = os.path.join(WORKDIR, 'similarity',
+                                              'pdb_protein_structure_tmscore_matrix.npy')
+    tmscore_heatmap_filepath = os.path.join(WORKDIR, 'similarity',
+                                               'pdb_protein_structure_tmscore_heatmap.png')
+    protein_chains_folder = os.path.join(WORKDIR, 'temp','protein_chains')
+    a=1
+    structures = []
+    # Generate list of structures
+    for _, assembly in df.iterrows():
+        for chain_id, chain_type in assembly['chains_types'].items():
+            if chain_type == 'protein':
+                assembly_dict = {}
+                assembly_dict['structure_id'] = assembly['assembly']+'_'+chain_id
+                assembly_dict['assembly'] = assembly['assembly']
+                assembly_dict['entry'] = assembly['entry']
+                assembly_dict['chain_id'] = chain_id
+                pdb_chain_filepath = os.path.join(protein_chains_folder,assembly_dict['structure_id'])
+                parser = PDB.PDBParser(QUIET=True)
+
+                structure = parser.get_structure(assembly_dict['structure_id'],assembly['structure_filepath'])
+                for model in structure:
+                    for chain in model:
+                        if chain.id == chain_id:
+                            new_structure = PDB.Structure.Structure('new_structure')
+                            new_model = PDB.Model.Model(0)
+                            new_model.add(chain.copy())  # Skopiuj łańcuch do nowego modelu
+                            new_structure.add(new_model)
+                            with open(pdb_chain_filepath,'w') as f:
+                                io = PDB.PDBIO()
+                                io.set_structure(new_structure)
+                                # Zapisz nowy plik PDB
+                                io.save(pdb_chain_filepath)
+                            if os.path.exists(pdb_chain_filepath):
+                                assembly_dict['pdb_structure_filepath'] = pdb_chain_filepath
+                structures.append(assembly_dict)
+
+
+
+
+
+
 def run(WORKDIR):
 
     list_of_assemblies = sorted(os.listdir(os.path.join(WORKDIR,'rawPDB')), key=lambda s: s[:4])
@@ -491,19 +555,19 @@ def run(WORKDIR):
     else:
         df = pd.read_pickle(DATAFRAME_FILEPATH)
 
-
     os.makedirs(os.path.join(WORKDIR,'similarity'), exist_ok=True)
     os.makedirs(os.path.join(WORKDIR, 'temp'), exist_ok=True)
 
     # Alignment i Podobieństwo Sekwencji DNA z FASTA
-    fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    #fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
-    pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    #pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji Białka z FASTA
     fasta_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
     pdb_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
-    # Podobieństwo strukturalne łańcuchów CTCF
+    # Podobieństwo strukturalne TM-Score łańcuchów CTCF
+    #pdb_protein_tmscore_analysis(df,WORKDIR=WORKDIR)
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--workdir', type=str, default='/Users/maciejwisniewski/data/SachinCTCF',
