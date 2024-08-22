@@ -566,9 +566,9 @@ def run(WORKDIR):
     os.makedirs(os.path.join(WORKDIR, 'temp'), exist_ok=True)
     os.makedirs(os.path.join(WORKDIR, 'temp','protein_chains'), exist_ok=True)
     # Alignment i Podobieństwo Sekwencji DNA z FASTA
-    #fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
-    #pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji Białka z FASTA
     fasta_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
