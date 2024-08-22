@@ -10,6 +10,9 @@ from Bio import AlignIO
 from Bio.Align.Applications import ClustalOmegaCommandline
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
+from scipy.spatial.distance import pdist
+
 
 PDB_NUCLEOTIDES_DICT = {
     '5CM':'C',
@@ -137,10 +140,12 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
 
     # Get all Strand One Sequences
     seqs = {}
+
     for _, row in df.iterrows():
         chain = next(iter(row['DNA_PDB_sequence']))
         seq = row['DNA_FASTA_sequence'][chain]
         seqs[row['assembly']+'_'+chain] = seq
+
 
     # Align Sequences
     temp_fasta_file_input = os.path.join(WORKDIR,'temp','temp_fasta_strand_1_dna_sequences.fasta')
@@ -148,8 +153,10 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
     similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','fasta_dna_sequence_clustalo_similairty_matrix.npy')
     similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','fasta_dna_sequence_clustalo_similairty_heatmap.png')
 
+
     with open(temp_fasta_file_input,'w') as f:
         for key, seq in seqs.items():
+
             f.write(f'>{key}\n{seq}\n')
 
     clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
@@ -167,10 +174,46 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
             matches = sum(res1 == res2 for res1, res2 in zip(alignment[i], alignment[j]))
             similarity_matrix[i, j] = matches / len(alignment[0])
 
-    sns.heatmap(similarity_matrix, cmap="viridis", annot=True)
+    distance_matrix = 1 - similarity_matrix  # Odległość (1 - podobieństwo)
+    linkage_matrix = linkage(pdist(distance_matrix), method='average')
+
+    # Reorder indices based on the dendrogram
+    ordered_indices = leaves_list(linkage_matrix)
+
+    # Reorder the similarity matrix according to the dendrogram
+    ordered_similarity_matrix = similarity_matrix[ordered_indices, :][:, ordered_indices]
+
+    # Reorder the groups according to the dendrogram
+    ordered_groups = df['entry'].iloc[ordered_indices].values
+
+    # Tworzenie wykresu z dendrogramem i heatmapą
+    fig, (ax_dendro, ax_heatmap) = plt.subplots(1, 2, figsize=(16, 8), gridspec_kw={"width_ratios": [1, 3]})
+
+    # Rysowanie dendrogramu
+    dendrogram(linkage_matrix, labels=df['assembly'], ax=ax_dendro, orientation='right')
+    ax_dendro.set_title('Dendrogram')
+    ax_dendro.set_xlabel('Distance')
+    ax_dendro.set_ylabel('Assemblies')
+
+    sns.heatmap(ordered_similarity_matrix, cmap="flaste", annot=False,
+                xticklabels=np.array(df['assembly'])[ordered_indices],
+                yticklabels=np.array(df['assembly'])[ordered_indices], ax=ax_heatmap)
+
+    unique_groups = np.unique(ordered_groups)
+    group_colors = {group: plt.cm.tab10(i / len(unique_groups)) for i, group in enumerate(unique_groups)}
+
+    # Dodanie prostokątów dla grup
+    for i, group in enumerate(unique_groups):
+        group_indices = np.where(ordered_groups == group)[0]
+        ax_heatmap.add_patch(
+            plt.Rectangle((group_indices[0] - 0.5, -0.5), len(group_indices), len(df), color=group_colors[group],
+                          alpha=0.3))
+
     plt.title("Similarity Matrix of Aligned Sequences")
     plt.xlabel("Sequence Index")
     plt.ylabel("Sequence Index")
+    plt.tight_layout()
+
     plt.savefig(similarity_heatmap_filepath)
 
 
@@ -197,6 +240,8 @@ def run(WORKDIR):
     else:
         df = pd.read_pickle(DATAFRAME_FILEPATH)
     # Alignment i Podobieństwo Sekwencji DNA z FASTA
+
+    os.makedirs(os.path.join(WORKDIR,'similarity'), exist_ok=True)
     fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
     # Podobieństwo strukturalne łańcuchów CTCF
