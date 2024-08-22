@@ -1,4 +1,5 @@
 import os
+import argparse
 import pandas as pd
 import numpy as np
 import re
@@ -141,11 +142,10 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
     # Align Sequences
     temp_fasta_file_input = os.path.join(WORKDIR,'temp','temp_fasta_strand_1_dna_sequences.fasta')
     temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_fasta_strand_1_dna_sequences.fasta')
-    clustalo
     with open(temp_fasta_file_input,'w') as f:
         for key, seq in seqs.items():
             f.write(f'>{key}\n{seq}\n')
-    if
+
     clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
                                                  outfile=temp_fasta_file_output,
                                                  verbose=True,
@@ -182,5 +182,9 @@ def run(WORKDIR):
     # Alignment i Podobieństwo Sekwencji DNA z PDB
     # Podobieństwo strukturalne łańcuchów CTCF
 if __name__ == '__main__':
-    WORKDIR = '/Users/maciejwisniewski/data/SachinCTCF'
-    run(WORKDIR)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--workdir', type=str, default='/Users/maciejwisniewski/data/SachinCTCF',
+                        help='Path to the working directory (default: current directory)')
+    args = parser.parse_args()
+
+    run(args.workdir)
