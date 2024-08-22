@@ -319,7 +319,8 @@ def pdb_dna_sequence_similarity_analysis(df,WORKDIR):
 
     plt.savefig(similarity_heatmap_filepath)
 def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
-    # INPUT, TEMP, OUTPUT FILES
+
+    # Specify INPUT, TEMP, OUTPUT FILES
     temp_fasta_file_input = os.path.join(WORKDIR,'temp','temp_fasta_protein_sequences.fasta')
     temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_fasta_protein_sequences.aln')
     similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','fasta_protein_sequence_clustalo_similairty_matrix.npy')
@@ -327,9 +328,13 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
 
     # CREATE SIMILARITY MATRIX FOR ALL CHAINS !
     if not os.path.exists(similarity_matrix_filepath):
+        # List for all protein chain structures
         all_chains_sequences = []
+        # Iterate over our DataFrame
         for _, row in df.iterrows():
+            # Iterate over Protein Chains in Specific Assembly
             for chain_id, chain_sequence in row['PROTEIN_FASTA_sequence'].items():
+                # Create Protein Chain Dict
                 seqdict = {}
                 seqdict['structure_id'] = row['assembly']+'_'+chain_id
                 seqdict['assembly'] = row['assembly']
@@ -338,9 +343,11 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
                 all_chains_sequences.append(seqdict)
 
         with open(temp_fasta_file_input,'w') as f:
+            # Create FASTA file with all proteins
             for sequence in all_chains_sequences:
                 f.write(f'>{sequence["structure_id"]}\n{sequence["protein_sequence"]}\n')
 
+        # CLustal Omega Alignment
         clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
                                                      outfile=temp_fasta_file_output,
                                                      verbose=True,
@@ -557,7 +564,7 @@ def run(WORKDIR):
 
     os.makedirs(os.path.join(WORKDIR,'similarity'), exist_ok=True)
     os.makedirs(os.path.join(WORKDIR, 'temp'), exist_ok=True)
-
+    os.makedirs(os.path.join(WORKDIR, 'temp','protein_chains'), exist_ok=True)
     # Alignment i Podobieństwo Sekwencji DNA z FASTA
     #fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
