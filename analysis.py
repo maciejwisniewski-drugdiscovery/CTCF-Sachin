@@ -99,13 +99,8 @@ class Assembly:
                         if chain.id == chain_id:
                             seq=''
                             for residue in chain:
-                                print(residue)
-                                print(residue.resname)
                                 if residue.resname.strip() in list(PDB_NUCLEOTIDES_DICT.keys()):
                                     seq += PDB_NUCLEOTIDES_DICT[residue.resname.strip()]
-                                else:
-                                    print(PDB_NUCLEOTIDES_DICT[residue.resname])
-                                print(seq)
                             seq_dict[chain_id] = seq
         return seq_dict
     def get_assembly_dict(self):
