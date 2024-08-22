@@ -132,7 +132,7 @@ class Assembly:
                                 print(peptide)
                                 seq_records.append(peptide.get_sequence())
                                 print(seq_records)
-                        seq_dict[chain_id] = str(seq_records[0])
+                            seq_dict[chain_id] = str(seq_records[0])
         return seq_dict
     def get_assembly_dict(self):
         assembly_dict = {}
