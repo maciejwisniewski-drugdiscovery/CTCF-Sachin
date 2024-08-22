@@ -100,7 +100,8 @@ class Assembly:
                             seq=''
                             for residue in chain:
                                 print(residue)
-                                seq += PDB_NUCLEOTIDES_DICT[residue.resname] if residue.resname in PDB_NUCLEOTIDES_DICT.keys() else ''
+                                print(residue.resname)
+                                seq += PDB_NUCLEOTIDES_DICT[residue.resname] if residue.resname in list(PDB_NUCLEOTIDES_DICT.keys()) else ''
                                 print(seq)
                             seq_dict[chain_id] = seq
         return seq_dict
