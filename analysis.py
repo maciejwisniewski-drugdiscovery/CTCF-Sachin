@@ -1,5 +1,7 @@
 import os
 import argparse
+import pdb
+
 import pandas as pd
 import numpy as np
 import re
@@ -9,6 +11,7 @@ from Bio.Seq import Seq
 from Bio import AlignIO
 from Bio.Align.Applications import ClustalOmegaCommandline
 import seaborn as sns
+sns.set_theme()
 import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
 from scipy.spatial.distance import pdist
@@ -137,92 +140,155 @@ class Assembly:
 
 def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
 
-
-    # Get all Strand One Sequences
-    seqs = {}
-
-    for _, row in df.iterrows():
-        chain = next(iter(row['DNA_PDB_sequence']))
-        seq = row['DNA_FASTA_sequence'][chain]
-        seqs[row['assembly']+'_'+chain] = seq
-
-
-    # Align Sequences
     temp_fasta_file_input = os.path.join(WORKDIR,'temp','temp_fasta_strand_1_dna_sequences.fasta')
     temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_fasta_strand_1_dna_sequences.aln')
     similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','fasta_dna_sequence_clustalo_similairty_matrix.npy')
     similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','fasta_dna_sequence_clustalo_similairty_heatmap.png')
 
 
-    with open(temp_fasta_file_input,'w') as f:
-        for key, seq in seqs.items():
+    if not os.path.exists(similarity_matrix_filepath):
+        # Get all Strand One Sequences
+        seqs = {}
 
-            f.write(f'>{key}\n{seq}\n')
+        for _, row in df.iterrows():
+            chain = next(iter(row['DNA_PDB_sequence']))
+            seq = row['DNA_FASTA_sequence'][chain]
+            seqs[row['assembly']+'_'+chain] = seq
 
-    clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
-                                                 outfile=temp_fasta_file_output,
-                                                 verbose=True,
-                                                 auto=True)
-    clustalomega_cline()
-    alignment = AlignIO.read(temp_fasta_file_output, "fasta")
+        with open(temp_fasta_file_input,'w') as f:
+            for key, seq in seqs.items():
+                f.write(f'>{key}\n{seq}\n')
 
-    num_sequences = len(alignment)
-    similarity_matrix = np.zeros((num_sequences, num_sequences))
-    # Obliczanie macierzy podobieństwa
-    for i in range(num_sequences):
-        for j in range(num_sequences):
-            matches = sum(res1 == res2 for res1, res2 in zip(alignment[i], alignment[j]))
-            similarity_matrix[i, j] = matches / len(alignment[0])
+        clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
+                                                     outfile=temp_fasta_file_output,
+                                                     verbose=True,
+                                                     auto=True)
+        clustalomega_cline()
+        alignment = AlignIO.read(temp_fasta_file_output, "fasta")
 
-    np.save(similarity_matrix_filepath, similarity_matrix)
+        num_sequences = len(alignment)
+        similarity_matrix = np.zeros((num_sequences, num_sequences))
+        #   Obliczanie macierzy podobieństwa
+        for i in range(num_sequences):
+            for j in range(num_sequences):
+                matches = sum(res1 == res2 for res1, res2 in zip(alignment[i], alignment[j]))
+                similarity_matrix[i, j] = matches / len(alignment[0])
 
-    distance_matrix = 1 - similarity_matrix  # Odległość (1 - podobieństwo)
-    linkage_matrix = linkage(pdist(distance_matrix), method='average')
+        np.save(similarity_matrix_filepath, similarity_matrix)
+    else:
+        similarity_matrix = np.load(similarity_matrix_filepath)
 
-    # Reorder indices based on the dendrogram
-    ordered_indices = leaves_list(linkage_matrix)
+    import matplotlib.pyplot as plt
 
-    # Reorder the similarity matrix according to the dendrogram
-    ordered_similarity_matrix = similarity_matrix[ordered_indices, :][:, ordered_indices]
+    # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry'
+    unique_entries = df['entry'].unique()
+    colors = sns.color_palette("dark", len(unique_entries))
+    entry_color_map = dict(zip(unique_entries, colors))
 
-    # Reorder the groups according to the dendrogram
-    ordered_groups = df['entry'].iloc[ordered_indices].values
+    # Stwórz listę kolorów odpowiadających każdemu assembly
+    assembly_colors = df['entry'].map(entry_color_map)
 
-    # Tworzenie wykresu z dendrogramem i heatmapą
-    fig, (ax_dendro, ax_heatmap) = plt.subplots(1, 2, figsize=(16, 8), gridspec_kw={"width_ratios": [1, 3]})
+    # Stwórz heatmapę z dodaniem kolorowych pasków (color bars)
+    plt.figure(figsize=(12, 10))
 
-    # Rysowanie dendrogramu
-    dendrogram(linkage_matrix, labels=df['assembly'], ax=ax_dendro, orientation='right')
-    ax_dendro.set_title('Dendrogram')
-    ax_dendro.set_xlabel('Distance')
-    ax_dendro.set_ylabel('Assemblies')
+    # Dodaj heatmapę
+    sns.heatmap(similarity_matrix, annot=False, cmap="flare",
+                xticklabels=df['assembly'], yticklabels=df['assembly'],
+                cbar_kws={'label': 'Similarity'}, linewidths=.5, linecolor='lightgrey')
 
-    sns.heatmap(ordered_similarity_matrix, cmap="flaste", annot=False,
-                xticklabels=np.array(df['assembly'])[ordered_indices],
-                yticklabels=np.array(df['assembly'])[ordered_indices], ax=ax_heatmap)
+    # Odległość etykiet od heatmapy
+    plt.gca().tick_params(axis='x', labelsize=12, pad=10)  # Większy pad (odstęp) na osi X
+    plt.gca().tick_params(axis='y', labelsize=12, pad=20)  # Większy pad (odstęp) na osi Y
 
-    unique_groups = np.unique(ordered_groups)
-    group_colors = {group: plt.cm.tab10(i / len(unique_groups)) for i, group in enumerate(unique_groups)}
+    # Dodaj paski kolorów na zewnątrz heatmapy
+    for (i, color) in enumerate(assembly_colors):
+        # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+        plt.gca().add_patch(
+            plt.Rectangle((-1, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
 
-    # Dodanie prostokątów dla grup
-    for i, group in enumerate(unique_groups):
-        group_indices = np.where(ordered_groups == group)[0]
-        ax_heatmap.add_patch(
-            plt.Rectangle((group_indices[0] - 0.5, -0.5), len(group_indices), len(df), color=group_colors[group],
-                          alpha=0.3))
+    # Dodaj tytuł
+    plt.text(x=-0.75, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
+    plt.title(label="Similarity HeatMap of Fasta DNA Sequences with Colored Labels for each Entry", fontsize=12, loc='center', x=0.5, y=1.05)
+    plt.ylabel('Assembly')
 
-    plt.title("Similarity Matrix of Aligned Sequences")
-    plt.xlabel("Sequence Index")
-    plt.ylabel("Sequence Index")
-    plt.tight_layout()
+    plt.savefig(similarity_heatmap_filepath)
+def pdb_dna_sequence_similarity_analysis(df,WORKDIR):
+
+    temp_fasta_file_input = os.path.join(WORKDIR,'temp','temp_pdb_strand_1_dna_sequences.fasta')
+    temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_pdb_strand_1_dna_sequences.aln')
+    similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','pdb_dna_sequence_clustalo_similairty_matrix.npy')
+    similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','pdb_dna_sequence_clustalo_similairty_heatmap.png')
+
+    if not os.path.exists(similarity_matrix_filepath):
+        # Get all Strand One Sequences
+        seqs = {}
+
+        for _, row in df.iterrows():
+            chain = next(iter(row['DNA_PDB_sequence']))
+            seq = row['DNA_PDB_sequence'][chain]
+            seqs[row['assembly']+'_'+chain] = seq
+
+        with open(temp_fasta_file_input,'w') as f:
+            for key, seq in seqs.items():
+                f.write(f'>{key}\n{seq}\n')
+
+        clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
+                                                     outfile=temp_fasta_file_output,
+                                                     verbose=True,
+                                                     auto=True)
+        clustalomega_cline()
+        alignment = AlignIO.read(temp_fasta_file_output, "fasta")
+
+        num_sequences = len(alignment)
+        similarity_matrix = np.zeros((num_sequences, num_sequences))
+        #   Obliczanie macierzy podobieństwa
+        for i in range(num_sequences):
+            for j in range(num_sequences):
+                matches = sum(res1 == res2 for res1, res2 in zip(alignment[i], alignment[j]))
+                similarity_matrix[i, j] = matches / len(alignment[0])
+
+        np.save(similarity_matrix_filepath, similarity_matrix)
+    else:
+        similarity_matrix = np.load(similarity_matrix_filepath)
+
+    import matplotlib.pyplot as plt
+
+    # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry'
+    unique_entries = df['entry'].unique()
+    colors = sns.color_palette("dark", len(unique_entries))
+    entry_color_map = dict(zip(unique_entries, colors))
+
+    # Stwórz listę kolorów odpowiadających każdemu assembly
+    assembly_colors = df['entry'].map(entry_color_map)
+
+    # Stwórz heatmapę z dodaniem kolorowych pasków (color bars)
+    plt.figure(figsize=(12, 10))
+
+    # Dodaj heatmapę
+    sns.heatmap(similarity_matrix, annot=False, cmap="flare",
+                xticklabels=df['assembly'], yticklabels=df['assembly'],
+                cbar_kws={'label': 'Similarity'}, linewidths=.5, linecolor='lightgrey')
+
+    # Odległość etykiet od heatmapy
+    plt.gca().tick_params(axis='x', labelsize=12, pad=10)  # Większy pad (odstęp) na osi X
+    plt.gca().tick_params(axis='y', labelsize=12, pad=20)  # Większy pad (odstęp) na osi Y
+
+    # Dodaj paski kolorów na zewnątrz heatmapy
+    for (i, color) in enumerate(assembly_colors):
+        # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+        plt.gca().add_patch(
+            plt.Rectangle((-1, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+
+    # Dodaj tytuł
+    plt.text(x=-0.75, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
+    plt.title(label="Similarity HeatMap of PDB Crystal DNA Sequences with Colored Labels for each Entry", fontsize=12, loc='center', x=0.5, y=1.05)
+    plt.ylabel('Assembly')
 
     plt.savefig(similarity_heatmap_filepath)
 
-
-
 def run(WORKDIR):
-
-    os.makedirs(os.path.join(WORKDIR,'temp'), exist_ok=True)
 
     list_of_assemblies = sorted(os.listdir(os.path.join(WORKDIR,'rawPDB')), key=lambda s: s[:4])
     list_of_pdb_filepaths = [os.path.join(WORKDIR,'rawPDB',x) for x in list_of_assemblies]
@@ -241,10 +307,14 @@ def run(WORKDIR):
         df.to_pickle(DATAFRAME_FILEPATH)
     else:
         df = pd.read_pickle(DATAFRAME_FILEPATH)
-    # Alignment i Podobieństwo Sekwencji DNA z FASTA
 
+
+    # Alignment i Podobieństwo Sekwencji DNA z FASTA
     os.makedirs(os.path.join(WORKDIR,'similarity'), exist_ok=True)
+    os.makedirs(os.path.join(WORKDIR, 'temp'), exist_ok=True)
+
     fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
     # Podobieństwo strukturalne łańcuchów CTCF
 if __name__ == '__main__':
