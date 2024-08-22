@@ -226,11 +226,13 @@ def pdb_dna_sequence_similarity_analysis(df,WORKDIR):
 
         for _, row in df.iterrows():
             chain = next(iter(row['DNA_PDB_sequence']))
+            print(chain)
             seq = row['DNA_PDB_sequence'][chain]
             seqs[row['assembly']+'_'+chain] = seq
 
         with open(temp_fasta_file_input,'w') as f:
             for key, seq in seqs.items():
+                print(seq)
                 f.write(f'>{key}\n{seq}\n')
 
         clustalomega_cline = ClustalOmegaCommandline(infile=temp_fasta_file_input,
