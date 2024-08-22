@@ -373,13 +373,14 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
     # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry' i 'Assembly'
     unique_entries = new_df['entry'].unique()
     unique_assemblies = new_df['assembly'].unique()
+    a=1
 
     entries_colors = sns.color_palette("dark", len(unique_entries))
-    assemblies_colors = sns.color_palette("dark", len(unique_entries))
+    assemblies_colors = sns.color_palette("dark", len(unique_assemblies))
 
     entry_color_map = dict(zip(unique_entries, entries_colors))
     assembly_color_map = dict(zip(unique_assemblies, assemblies_colors))
-
+    a=1
     # Stwórz listę kolorów odpowiadających każdemu assembly i entry
     entry_colors = new_df['entry'].map(entry_color_map)
     assembly_colors = new_df['assembly'].map(assembly_color_map)
@@ -464,7 +465,7 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
     unique_assemblies = new_df['assembly'].unique()
 
     entries_colors = sns.color_palette("dark", len(unique_entries))
-    assemblies_colors = sns.color_palette("dark", len(unique_entries))
+    assemblies_colors = sns.color_palette("dark", len(unique_assemblies))
 
     entry_color_map = dict(zip(unique_entries, entries_colors))
     assembly_color_map = dict(zip(unique_assemblies, assemblies_colors))
