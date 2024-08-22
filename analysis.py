@@ -1,6 +1,5 @@
 import os
 import argparse
-import pdb
 
 import pandas as pd
 import numpy as np
@@ -13,8 +12,7 @@ from Bio.Align.Applications import ClustalOmegaCommandline
 import seaborn as sns
 sns.set_theme()
 import matplotlib.pyplot as plt
-from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
-from scipy.spatial.distance import pdist
+
 
 
 PDB_NUCLEOTIDES_DICT = {
@@ -101,7 +99,9 @@ class Assembly:
                         if chain.id == chain_id:
                             seq=''
                             for residue in chain:
+                                print(residue)
                                 seq += PDB_NUCLEOTIDES_DICT[residue.resname] if residue.resname in PDB_NUCLEOTIDES_DICT.keys() else ''
+                                print(seq)
                             seq_dict[chain_id] = seq
         return seq_dict
     def get_assembly_dict(self):
