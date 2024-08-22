@@ -8,7 +8,8 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio import AlignIO
 from Bio.Align.Applications import ClustalOmegaCommandline
-
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 PDB_NUCLEOTIDES_DICT = {
     '5CM':'C',
@@ -132,6 +133,8 @@ class Assembly:
         return meth_dict, meth_indexes_dict
 
 def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
+
+
     # Get all Strand One Sequences
     seqs = {}
     for _, row in df.iterrows():
@@ -141,7 +144,10 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
 
     # Align Sequences
     temp_fasta_file_input = os.path.join(WORKDIR,'temp','temp_fasta_strand_1_dna_sequences.fasta')
-    temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_fasta_strand_1_dna_sequences.fasta')
+    temp_fasta_file_output = os.path.join(WORKDIR,'temp','temp_aligned_fasta_strand_1_dna_sequences.aln')
+    similarity_matrix_filepath = os.path.join(WORKDIR,'similarity','fasta_dna_sequence_clustalo_similairty_matrix.npy')
+    similarity_heatmap_filepath = os.path.join(WORKDIR,'similarity','fasta_dna_sequence_clustalo_similairty_heatmap.png')
+
     with open(temp_fasta_file_input,'w') as f:
         for key, seq in seqs.items():
             f.write(f'>{key}\n{seq}\n')
@@ -152,14 +158,27 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
                                                  auto=True)
     clustalomega_cline()
     alignment = AlignIO.read(temp_fasta_file_output, "fasta")
-    for record in alignment:
-        print(record.id, record.seq)
 
-    a=1
+    num_sequences = len(alignment)
+    similarity_matrix = np.zeros((num_sequences, num_sequences))
+    # Obliczanie macierzy podobieństwa
+    for i in range(num_sequences):
+        for j in range(num_sequences):
+            matches = sum(res1 == res2 for res1, res2 in zip(alignment[i], alignment[j]))
+            similarity_matrix[i, j] = matches / len(alignment[0])
+
+    sns.heatmap(similarity_matrix, cmap="viridis", annot=True)
+    plt.title("Similarity Matrix of Aligned Sequences")
+    plt.xlabel("Sequence Index")
+    plt.ylabel("Sequence Index")
+    plt.savefig(similarity_heatmap_filepath)
 
 
 
 def run(WORKDIR):
+
+    os.makedirs(os.path.join(WORKDIR,'temp'), exist_ok=True)
+
     list_of_assemblies = sorted(os.listdir(os.path.join(WORKDIR,'rawPDB')), key=lambda s: s[:4])
     list_of_pdb_filepaths = [os.path.join(WORKDIR,'rawPDB',x) for x in list_of_assemblies]
     list_of_fasta_filepaths = [os.path.join(WORKDIR,'rawSeq',x) for x in os.listdir(os.path.join(WORKDIR,'rawSeq'))]
