@@ -127,9 +127,11 @@ class Assembly:
                         if chain.id == chain_id:
                             ppb = PDB.PPBuilder()
                             peptides = ppb.build_peptides(chain)
+                            print(chain)
                             for peptide in peptides:
                                 print(peptide)
                                 seq_records.append(peptide.get_sequence())
+                                print(seq_records)
                         seq_dict[chain_id] = str(seq_records[0])
         return seq_dict
     def get_assembly_dict(self):
