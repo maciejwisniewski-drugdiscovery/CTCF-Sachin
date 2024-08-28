@@ -209,7 +209,6 @@ def fasta_dna_sequence_similarity_analysis(df,WORKDIR):
     else:
         similarity_matrix = np.load(similarity_matrix_filepath)
 
-    import matplotlib.pyplot as plt
 
     # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry'
     unique_entries = df['entry'].unique()
@@ -373,14 +372,12 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
     # Utwórz mapowanie kolorów dla każdej grupy w kolumnie 'Entry' i 'Assembly'
     unique_entries = new_df['entry'].unique()
     unique_assemblies = new_df['assembly'].unique()
-    a=1
-
     entries_colors = sns.color_palette("dark", len(unique_entries))
     assemblies_colors = sns.color_palette("dark", len(unique_assemblies))
 
     entry_color_map = dict(zip(unique_entries, entries_colors))
     assembly_color_map = dict(zip(unique_assemblies, assemblies_colors))
-    a=1
+
     # Stwórz listę kolorów odpowiadających każdemu assembly i entry
     entry_colors = new_df['entry'].map(entry_color_map)
     assembly_colors = new_df['assembly'].map(assembly_color_map)
@@ -401,14 +398,14 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
     for (i, color) in enumerate(assembly_colors):
         # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
         plt.gca().add_patch(
-            plt.Rectangle((-1, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+            plt.Rectangle((-1.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
     for (i, color) in enumerate(entry_colors):
         # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
         plt.gca().add_patch(
-            plt.Rectangle((-1.5, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+            plt.Rectangle((-2.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
     # Dodaj tytuł
-    plt.text(x=-0.75, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
-    plt.text(x=-1.25, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=-1.00, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=-2.00, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
 
     plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
     plt.title(label="Similarity HeatMap of Fasta Protein Sequences with Colored Labels for each Entry", fontsize=12, loc='center', x=0.5, y=1.05)
@@ -490,14 +487,14 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
     for (i, color) in enumerate(assembly_colors):
         # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
         plt.gca().add_patch(
-            plt.Rectangle((-1, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+            plt.Rectangle((-1.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
     for (i, color) in enumerate(entry_colors):
         # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
         plt.gca().add_patch(
-            plt.Rectangle((-1.5, i + 0.05), 0.5, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+            plt.Rectangle((-2.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
     # Dodaj tytuł
-    plt.text(x=-0.75, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
-    plt.text(x=-1.25, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=-1.00, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
+    plt.text(x=-2.00, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
 
     plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
     plt.title(label="Similarity HeatMap of PDB Protein Sequences with Colored Labels for each Entry", fontsize=12,
@@ -510,7 +507,6 @@ def pdb_protein_tmscore_analysis(df,WORKDIR):
     tmscore_heatmap_filepath = os.path.join(WORKDIR, 'similarity',
                                                'pdb_protein_structure_tmscore_heatmap.png')
     protein_chains_folder = os.path.join(WORKDIR, 'temp','protein_chains')
-    a=1
     structures = []
     # Generate list of structures
     for _, assembly in df.iterrows():
@@ -570,15 +566,18 @@ def run(WORKDIR):
     os.makedirs(os.path.join(WORKDIR, 'temp'), exist_ok=True)
     os.makedirs(os.path.join(WORKDIR, 'temp','protein_chains'), exist_ok=True)
     # Alignment i Podobieństwo Sekwencji DNA z FASTA
-    fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    #fasta_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
-    pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    #pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji Białka z FASTA
-    fasta_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    #fasta_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
-    pdb_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    #pdb_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Podobieństwo strukturalne TM-Score łańcuchów CTCF
-    #pdb_protein_tmscore_analysis(df,WORKDIR=WORKDIR)
+    pdb_protein_tmscore_analysis(df,WORKDIR=WORKDIR)
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--workdir', type=str, default='/Users/maciejwisniewski/data/SachinCTCF',
