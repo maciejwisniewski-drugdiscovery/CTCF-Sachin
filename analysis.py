@@ -1,6 +1,7 @@
 import os
 import argparse
 import tempfile
+import json
 
 import pandas as pd
 import numpy as np
@@ -10,6 +11,8 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio import AlignIO
 from Bio.Align.Applications import ClustalOmegaCommandline
+from tmtools import tm_align
+from tmtools.io import get_structure, get_residue_data
 import seaborn as sns
 sns.set_theme()
 import matplotlib.pyplot as plt
@@ -23,7 +26,10 @@ PDB_NUCLEOTIDES_DICT = {
     'DT':'T',
     'DG':'G',
 }
-
+def convert_ndarray_to_list(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()  # Convert ndarray to list
+    raise TypeError("Object of type %s is not JSON serializable" % type(obj))
 def identify_chain_type(seq):
     alphabets = {'dna': re.compile('^[acgtn]*$', re.I),
                  'protein': re.compile('^[acdefghiklmnpqrstvwy]*$', re.I)}
@@ -392,7 +398,7 @@ def fasta_protein_sequence_similarity_analysis(df,WORKDIR):
 
     # Odległość etykiet od heatmapy
     plt.gca().tick_params(axis='x', labelsize=12, pad=10)  # Większy pad (odstęp) na osi X
-    plt.gca().tick_params(axis='y', labelsize=12, pad=20)  # Większy pad (odstęp) na osi Y
+    plt.gca().tick_params(axis='y', labelsize=12, pad=35)  # Większy pad (odstęp) na osi Y
 
     # Dodaj paski kolorów na zewnątrz heatmapy
     for (i, color) in enumerate(assembly_colors):
@@ -481,7 +487,7 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
 
     # Odległość etykiet od heatmapy
     plt.gca().tick_params(axis='x', labelsize=12, pad=10)  # Większy pad (odstęp) na osi X
-    plt.gca().tick_params(axis='y', labelsize=12, pad=20)  # Większy pad (odstęp) na osi Y
+    plt.gca().tick_params(axis='y', labelsize=12, pad=35)  # Większy pad (odstęp) na osi Y
 
     # Dodaj paski kolorów na zewnątrz heatmapy
     for (i, color) in enumerate(assembly_colors):
@@ -502,40 +508,166 @@ def pdb_protein_sequence_similarity_analysis(df,WORKDIR):
     plt.ylabel('Structures [Entry_Assembly_Chain]')
     plt.savefig(similarity_heatmap_filepath)
 def pdb_protein_tmscore_analysis(df,WORKDIR):
+    protein_structures_json_filepath = os.path.join(WORKDIR,'temp','protein_structures.json')
     tmscore_matrix_filepath = os.path.join(WORKDIR, 'similarity',
-                                              'pdb_protein_structure_tmscore_matrix.npy')
+                                           'pdb_protein_structure_tmscore_matrix.npy')
     tmscore_heatmap_filepath = os.path.join(WORKDIR, 'similarity',
-                                               'pdb_protein_structure_tmscore_heatmap.png')
+                                            'pdb_protein_structure_tmscore_heatmap.png')
+    rmsd_matrix_filepath = os.path.join(WORKDIR, 'similarity',
+                                        'pdb_protein_structure_rmsd_matrix.npy')
+    rmsd_heatmap_filepath = os.path.join(WORKDIR, 'similarity',
+                                        'pdb_protein_structure_rmsd_heatmap.png')
     protein_chains_folder = os.path.join(WORKDIR, 'temp','protein_chains')
     structures = []
-    # Generate list of structures
-    for _, assembly in df.iterrows():
-        for chain_id, chain_type in assembly['chains_types'].items():
-            if chain_type == 'protein':
-                assembly_dict = {}
-                assembly_dict['structure_id'] = assembly['assembly']+'_'+chain_id
-                assembly_dict['assembly'] = assembly['assembly']
-                assembly_dict['entry'] = assembly['entry']
-                assembly_dict['chain_id'] = chain_id
-                pdb_chain_filepath = os.path.join(protein_chains_folder,assembly_dict['structure_id'])
-                parser = PDB.PDBParser(QUIET=True)
+    if not os.path.exists(protein_structures_json_filepath):
+        # Generate list of structures
+        for _, assembly in df.iterrows():
+            for chain_id, chain_type in assembly['chains_types'].items():
+                if chain_type == 'protein':
+                    assembly_dict = {}
+                    assembly_dict['structure_id'] = assembly['assembly']+'_'+chain_id
+                    assembly_dict['assembly'] = assembly['assembly']
+                    assembly_dict['entry'] = assembly['entry']
+                    assembly_dict['chain_id'] = chain_id
 
-                structure = parser.get_structure(assembly_dict['structure_id'],assembly['structure_filepath'])
-                for model in structure:
-                    for chain in model:
-                        if chain.id == chain_id:
-                            new_structure = PDB.Structure.Structure('new_structure')
-                            new_model = PDB.Model.Model(0)
-                            new_model.add(chain.copy())  # Skopiuj łańcuch do nowego modelu
-                            new_structure.add(new_model)
-                            with open(pdb_chain_filepath,'w') as f:
-                                io = PDB.PDBIO()
-                                io.set_structure(new_structure)
-                                # Zapisz nowy plik PDB
-                                io.save(pdb_chain_filepath)
-                            if os.path.exists(pdb_chain_filepath):
-                                assembly_dict['pdb_structure_filepath'] = pdb_chain_filepath
-                structures.append(assembly_dict)
+                    pdb_chain_filepath = os.path.join(protein_chains_folder,assembly_dict['structure_id'])
+                    parser = PDB.PDBParser(QUIET=True)
+
+                    structure = parser.get_structure(assembly_dict['structure_id'],assembly['structure_filepath'])
+                    for model in structure:
+                        for chain in model:
+                            if chain.id == chain_id:
+                                new_structure = PDB.Structure.Structure('new_structure')
+                                new_model = PDB.Model.Model(0)
+                                new_model.add(chain.copy())  # Skopiuj łańcuch do nowego modelu
+                                new_structure.add(new_model)
+                                with open(pdb_chain_filepath,'w') as f:
+                                    io = PDB.PDBIO()
+                                    io.set_structure(new_structure)
+                                    # Zapisz nowy plik PDB
+                                    io.save(pdb_chain_filepath)
+                                if os.path.exists(pdb_chain_filepath):
+                                    assembly_dict['pdb_structure_filepath'] = pdb_chain_filepath
+
+                    s = get_structure(assembly_dict['pdb_structure_filepath'])
+                    chain = next(s.get_chains())
+                    coords, seq = get_residue_data(chain)
+                    assembly_dict['xyz'] = coords
+                    assembly_dict['seq'] = seq
+                    structures.append(assembly_dict)
+
+        with open(protein_structures_json_filepath, 'w') as file:
+            json.dump(structures, file,default=convert_ndarray_to_list, indent=4)
+    else:
+        with open(protein_structures_json_filepath, 'r') as file:
+            structures = json.load(file)
+            for item in structures:
+                if isinstance(item['xyz'], list):
+                    item['xyz'] = np.array(item['xyz'])
+    if not os.path.exists(tmscore_matrix_filepath):
+        tmscore_matrix = np.zeros((len(structures),len(structures)))
+        rmsd_matrix = np.zeros((len(structures),len(structures)))
+        for i1,assembly1 in enumerate(structures):
+            for i2, assembly2 in enumerate(structures):
+                res = tm_align(assembly1['xyz'], assembly2['xyz'], assembly1['seq'], assembly2['seq'])
+                tmscore_matrix[i1,i2] = res.tm_norm_chain1
+                rmsd_matrix[i1,i2] = res.rmsd
+                print('TM-Score Norm Chain1: ',res.tm_norm_chain1)
+                print('TM-Score Norm Chain2: ',res.tm_norm_chain1)
+                print('RMSD: ',res.rmsd)
+        np.save(tmscore_matrix_filepath,tmscore_matrix)
+        np.save(rmsd_matrix_filepath,rmsd_matrix)
+    else:
+        rmsd_matrix = np.load(rmsd_matrix_filepath)
+        tmscore_matrix = np.load(tmscore_matrix_filepath)
+
+    new_df = pd.DataFrame(structures)
+
+    if not os.path.exists(tmscore_heatmap_filepath):
+        unique_entries = new_df['entry'].unique()
+        unique_assemblies = new_df['assembly'].unique()
+
+        entries_colors = sns.color_palette("dark", len(unique_entries))
+        assemblies_colors = sns.color_palette("dark", len(unique_assemblies))
+
+        entry_color_map = dict(zip(unique_entries, entries_colors))
+        assembly_color_map = dict(zip(unique_assemblies, assemblies_colors))
+
+        # Stwórz listę kolorów odpowiadających każdemu assembly i entry
+        entry_colors = new_df['entry'].map(entry_color_map)
+        assembly_colors = new_df['assembly'].map(assembly_color_map)
+        plt.figure(figsize=(12, 10))
+        # Dodaj heatmapę
+        sns.heatmap(tmscore_matrix, annot=False, cmap="flare",
+                    xticklabels=new_df['structure_id'], yticklabels=new_df['structure_id'],
+                    cbar_kws={'label': 'Similarity'}, linewidths=.5, linecolor='lightgrey')
+
+        # Odległość etykiet od heatmapy
+        plt.gca().tick_params(axis='x', labelsize=8, pad=10)  # Większy pad (odstęp) na osi X
+        plt.gca().tick_params(axis='y', labelsize=8, pad=35)  # Większy pad (odstęp) na osi Y
+
+        # Dodaj paski kolorów na zewnątrz heatmapy
+        for (i, color) in enumerate(assembly_colors):
+            # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+            plt.gca().add_patch(
+                plt.Rectangle((-1.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+        for (i, color) in enumerate(entry_colors):
+            # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+            plt.gca().add_patch(
+                plt.Rectangle((-2.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+        # Dodaj tytuł
+        plt.text(x=-1.00, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
+        plt.text(x=-2.00, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+
+        plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
+        plt.title(label="TM-Score HeatMap of PDB Protein Structures with Colored Labels for each Entry", fontsize=12,
+                  loc='center', x=0.5, y=1.05)
+        plt.ylabel('Structures [Entry_Assembly_Chain]')
+        plt.savefig(tmscore_heatmap_filepath)
+    if not os.path.exists(rmsd_heatmap_filepath):
+        unique_entries = new_df['entry'].unique()
+        unique_assemblies = new_df['assembly'].unique()
+
+        entries_colors = sns.color_palette("dark", len(unique_entries))
+        assemblies_colors = sns.color_palette("dark", len(unique_assemblies))
+
+        entry_color_map = dict(zip(unique_entries, entries_colors))
+        assembly_color_map = dict(zip(unique_assemblies, assemblies_colors))
+
+        # Stwórz listę kolorów odpowiadających każdemu assembly i entry
+        entry_colors = new_df['entry'].map(entry_color_map)
+        assembly_colors = new_df['assembly'].map(assembly_color_map)
+        plt.figure(figsize=(12, 10))
+        # Dodaj heatmapę
+        sns.heatmap(rmsd_matrix, annot=False, cmap="flare",
+                    xticklabels=new_df['structure_id'], yticklabels=new_df['structure_id'],
+                    cbar_kws={'label': 'Similarity'}, linewidths=.5, linecolor='lightgrey')
+
+        # Odległość etykiet od heatmapy
+        plt.gca().tick_params(axis='x', labelsize=8, pad=10)  # Większy pad (odstęp) na osi X
+        plt.gca().tick_params(axis='y', labelsize=8, pad=35)  # Większy pad (odstęp) na osi Y
+
+        # Dodaj paski kolorów na zewnątrz heatmapy
+        for (i, color) in enumerate(assembly_colors):
+            # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+            plt.gca().add_patch(
+                plt.Rectangle((-1.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+        for (i, color) in enumerate(entry_colors):
+            # plt.gca().add_patch(plt.Rectangle((i, -0.5), 1, 0.5, color=color, transform=plt.gca().transData, clip_on=True))
+            plt.gca().add_patch(
+                plt.Rectangle((-2.5, i + 0.05), 1.0, 0.9, color=color, transform=plt.gca().transData, clip_on=False))
+        # Dodaj tytuł
+        plt.text(x=-1.00, y=-0.5, s='Assemblies', fontsize=10, ha='center', rotation='vertical')
+        plt.text(x=-2.00, y=-0.5, s='Entries', fontsize=10, ha='center', rotation='vertical')
+
+        plt.text(x=15, y=-0.5, s='HeatMap', fontsize=10, ha='center')
+        plt.title(label="RMSD HeatMap of PDB Protein Structures with Colored Labels for each Entry", fontsize=12,
+                  loc='center', x=0.5, y=1.05)
+        plt.ylabel('Structures [Entry_Assembly_Chain]')
+        plt.savefig(rmsd_heatmap_filepath)
+
+    a=1
+
 
 
 
@@ -570,9 +702,9 @@ def run(WORKDIR):
     # Alignment i Podobieństwo Sekwencji DNA z PDB
     #pdb_dna_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji Białka z FASTA
-    #fasta_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    fasta_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Alignment i Podobieństwo Sekwencji DNA z PDB
-    #pdb_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
+    pdb_protein_sequence_similarity_analysis(df,WORKDIR=WORKDIR)
     # Podobieństwo strukturalne TM-Score łańcuchów CTCF
     pdb_protein_tmscore_analysis(df,WORKDIR=WORKDIR)
 
