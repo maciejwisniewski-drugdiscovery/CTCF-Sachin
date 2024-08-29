@@ -11,6 +11,25 @@ def run(config):
 
     os.makedirs(os.path.join(config['outdir']), exist_ok=True)
     openmm = OpenMMSimulation(config)
+    if openmm.steps_to_run != 0:
+        if os.path.exists(openmm.InitialSystemFile) and os.path.exists(openmm.InitialTopologyFile):
+            print('[*] Load Complex Model')
+            openmm.load_model()
+            print('[*] Load Simulation System')
+            openmm.load_system()
+        else:
+            print('[*] Generate Simulation System ')
+            openmm.generate_initial_system()
+        # WarmUp Simulation
+        if not os.path.exists(openmm.WarmedCheckpointFile):
+            print('[*] WarmUp Simulation')
+            openmm.warmup()
+
+        # Production Run
+        print('[*] Production Run Simulation')
+        openmm.production()
+
+    print('[*] Simulation Done')
 
 
     return None
@@ -19,7 +38,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Molecular Dynamic Simulation with OpenMM")
     parser.add_argument('--pdbid', type=str, required=True, help='Specific PDB ID... please... ;-;')
     parser.add_argument('--outdir', type=str, required=True, help='Path to the Output Directory.')
-    parser.add_argument('--complex_file',nargs='+', type=str, required=True, help='Complex PDB Structure Filepath.')
+    parser.add_argument('--complex_file', type=str, required=True, help='Complex PDB Structure Filepath.')
     parser.add_argument('--platform',type=str,required=False,default='CUDA',help='Define if you want the OpenCL or CUDA support')
     # Molecular Dynamics Simulation Forcefields
 
@@ -32,7 +51,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_modeller', action='store_true',help='Define if you want to rebuild the Protein Structures with the modeller.')
     parser.add_argument('--add_solvate', action='store_true', help="Add Solvent Molecules to the Complex Model")
     parser.add_argument('--add_prot_const', action='store_true', help="Add Protein Constraints to the Complex Model")
-    parser.add_argument("--padding", type=float, default=1.0, help="Padding for solvent box [nm]")
+    parser.add_argument("--padding", type=float, default=10.0, help="Padding for solvent box [nm]")
     parser.add_argument("--ionic_strength", type=float, default=0.15, help="Ionic strength for solvation [molar]")
     # Molecular Dynamics Simulation Parameters
     parser.add_argument("--friction_value", type=float, default=1.0,

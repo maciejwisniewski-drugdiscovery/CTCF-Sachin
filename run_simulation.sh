@@ -1,10 +1,9 @@
 #!/bin/bash
 
 
-python run_simulation.py  --pdbid 10gs \
-                          --outdir /Users/maciejwisniewski/data/QBioLipDynamics/results \
-                          --protein_files /Users/maciejwisniewski/data/QBioLipDynamics/10gs_1.pdb \
-                          --ligand_files /Users/maciejwisniewski/data/QBioLipDynamics/10gs_1_VWW_E.pdb \
+python run_simulation.py  --pdbid 5T00 \
+                          --outdir /Users/maciejwisniewski/data/SachinCTCF/dynamics/5T00_1 \
+                          --complex_file /Users/maciejwisniewski/data/SachinCTCF/rawPDB/5T00_1.pdb \
                           --platform CPU \
                           --add_solvate \
                           --padding 1.0 \
@@ -15,5 +14,9 @@ python run_simulation.py  --pdbid 10gs \
                           --heating_step 100 \
                           --heating_write_interval 100 \
                           --temp_value 300 \
-                          --production_write_interval 10000 \
-                          --max_steps 100000000
+                          --production_write_interval 1000 \
+                          --max_steps 100000000 \
+
+# 100ns simulation with interval every 10 ps
+
+# 100 000 000 / 10 000 => 10000timeshots
