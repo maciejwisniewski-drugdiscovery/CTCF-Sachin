@@ -448,12 +448,7 @@ class OpenMMSimulation():
         )
         # Set Trajectory Reporter
         production_simulation.reporters.append(
-            app.xtcreporter.XTCReporter(
-                file = self.ProductionTrajectoryFile,
-                reportInterval = self.config['productionWriteInterval']
-            ),
-            enforcePeriodicBox = False,
-            append = os.path.exists(self.ProductionTrajectoryFile)
+            app.xtcreporter.XTCReporter(file = self.ProductionTrajectoryFile,reportInterval = self.config['productionWriteInterval'],enforcePeriodicBox = False,append = os.path.exists(self.ProductionTrajectoryFile))
         )
         # Set State Data Reporter
         production_simulation.reporters.append(
